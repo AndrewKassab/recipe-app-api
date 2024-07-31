@@ -4,7 +4,7 @@ Views for the recipe api
 from rest_framework import viewsets, authentication, permissions, mixins
 
 from recipe import serializers
-from core.models import Recipe, Tag
+from core.models import Recipe, Tag, Ingredient
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -39,3 +39,16 @@ class TagViewSet(mixins.ListModelMixin,
 
     def get_queryset(self):
         return Tag.objects.filter(user=self.request.user).order_by('-name')
+
+
+class IngredientViewSet(mixins.ListModelMixin,
+                        mixins.UpdateModelMixin,
+                        mixins.DestroyModelMixin,
+                        viewsets.GenericViewSet):
+    serializer_class = serializers.IngredientSerializer
+    queryset = Ingredient.objects.all()
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Ingredient.objects.filter(user=self.request.user).order_by('-name')

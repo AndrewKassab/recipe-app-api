@@ -13,12 +13,14 @@ from rest_framework.test import APIClient
 from core.models import (
     Recipe,
     Tag,
+    Ingredient,
 )
 
 from recipe.serializers import (
     RecipeSerializer,
     RecipeDetailSerializer,
 )
+from recipe.tests.base_test_name_user_model_api import BasePublicRecipeModelApiTests
 from user.tests.test_user_api import create_user
 
 RECIPES_URL = reverse('recipe:recipe-list')
@@ -43,17 +45,9 @@ def create_recipe(user, **params):
     return recipe
 
 
-class PublicRecipeApiTests(TestCase):
-    """Test unauthenticated API requests."""
-
-    def setUp(self):
-        self.client = APIClient()
-
-    def test_auth_required(self):
-        """Test auth is required to call API."""
-        res = self.client.get(RECIPES_URL)
-
-        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+class PublicRecipeApiTests(BasePublicRecipeModelApiTests, TestCase):
+    model = Recipe
+    url = RECIPES_URL
 
 
 class PrivateRecipeApiTests(TestCase):
@@ -214,7 +208,7 @@ class PrivateRecipeApiTests(TestCase):
             'title': "Thai Prawn Curry",
             'time_minutes': 30,
             'price': Decimal('2.50'),
-            'tags': [{'name': 'Thai'}, {'name':'Dinner'}],
+            'tags': [{'name': 'Thai'}, {'name': 'Dinner'}],
         }
 
         res = self.client.post(RECIPES_URL, payload, format='json')
@@ -292,3 +286,48 @@ class PrivateRecipeApiTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(recipe.tags.count(), 0)
+
+    def test_create_recipe_with_new_ingredients(self):
+        payload = {
+            'title': "Thai Prawn Curry",
+            'time_minutes': 30,
+            'price': Decimal('2.50'),
+            'ingredients': [{'name': 'Shrimp'}, {'name': 'Coconut Milk'}],
+        }
+
+        res = self.client.post(RECIPES_URL, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipes = Recipe.objects.filter(user=self.user)
+        self.assertEqual(recipes.count(), 1)
+        recipe = recipes[0]
+        self.assertEqual(recipe.ingredients.count(), 2)
+        for ingredient in payload['ingredients']:
+            exists = recipe.ingredients.filter(
+                name=ingredient['name']
+            ).exists()
+            self.assertTrue(exists)
+
+
+    def test_create_recipe_existing_ingredient(self):
+        ingredient = Ingredient.objects.create(user=self.user, name='Lemon')
+        payload = {
+            'title': 'Vietnamese Soup',
+            'time_minutes': 25,
+            'price': '2.55',
+            'ingredients': [{'name': 'Lemon'}, {'name': 'Fish Sauce'}],
+        }
+        res = self.client.post(RECIPES_URL, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipes = Recipe.objects.filter(user=self.user)
+        self.assertEqual(recipes.count(), 1)
+        recipe = recipes[0]
+        self.assertEqual(recipe.ingredients.count(), 2)
+        self.assertIn(ingredient, recipe.ingredients.all())
+        for ingredient in payload['ingredients']:
+            exists = recipe.ingredients.filter(
+                name=ingredient['name'],
+                user=self.user,
+            ).exists()
+            self.assertTrue(exists)
