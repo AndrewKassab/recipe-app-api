@@ -331,3 +331,30 @@ class PrivateRecipeApiTests(TestCase):
                 user=self.user,
             ).exists()
             self.assertTrue(exists)
+
+    def test_create_tag_on_update(self):
+        recipe = create_recipe(user=self.user)
+
+        payload = {
+            'ingredients': [{'name': 'Shrimp'}]
+        }
+        url = detail_url(recipe.id)
+        res = self.client.patch(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        new_ingredient = Ingredient.objects.get(user=self.user, name='Shrimp')
+        self.assertIn(new_ingredient, recipe.ingredients.all())
+
+    def test_update_recipe_assign_ingredient(self):
+        ingredient = Ingredient.objects.create(user=self.user, name='Shrimp')
+        recipe = create_recipe(user=self.user)
+
+        payload = {
+            'ingredients': [{'name': 'Shrimp'}]
+        }
+
+        url = detail_url(recipe.id)
+        res = self.client.patch(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn(ingredient, recipe.ingredients.all())
